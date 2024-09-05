@@ -1,6 +1,6 @@
 ﻿create table BTL_QLDIEMSV
 
-use BenhVienDB
+use BTL_QLDIEMSV
 
 --tạo bảng môn học
 create table MONHOC
