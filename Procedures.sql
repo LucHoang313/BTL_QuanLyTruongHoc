@@ -85,6 +85,144 @@ group by KHOA.MAKHOA
 
 exec DemSVTheoKhoa
 
+--tạo thủ tục hiện danh sách sinh viên theo hệ đào tạo
+CREATE PROCEDURE SP_HienThiSinhVienTheoHeDaoTao
+    @MAHEDT char(10)
+AS
+BEGIN
+    -- Kiểm tra xem mã hệ đào tạo có tồn tại trong bảng HEDT hay không
+    IF NOT EXISTS (SELECT 1 FROM HEDT WHERE MAHEDT = @MAHEDT)
+    BEGIN
+        PRINT 'Mã hệ đào tạo không tồn tại.';
+        RETURN;
+    END
+
+    -- Truy vấn danh sách sinh viên theo hệ đào tạo
+    SELECT SV.MASV, SV.TENSV, SV.GIOITINH, SV.NGAYSINH, SV.QUEQUAN, L.TENLOP, H.TENHEDAOTAO
+    FROM SINHVIEN SV
+    JOIN LOP L ON SV.MALOP = L.MALOP
+    JOIN HEDT H ON L.MAHDT = H.MAHEDT
+    WHERE H.MAHEDT = @MAHEDT
+    ORDER BY SV.MASV;
+
+    PRINT 'Hiển thị danh sách sinh viên theo hệ đào tạo thành công.';
+END;
+
+--tạo thủ tục hiện danh sách sinh viên theo lớp
+CREATE PROCEDURE SP_HienThiSinhVienTheoLop
+    @MALOP char(10)
+AS
+BEGIN
+    -- Kiểm tra xem mã lớp có tồn tại trong bảng LOP hay không
+    IF NOT EXISTS (SELECT 1 FROM LOP WHERE MALOP = @MALOP)
+    BEGIN
+        PRINT 'Mã lớp không tồn tại.';
+        RETURN;
+    END
+
+    -- Truy vấn danh sách sinh viên theo lớp
+    SELECT SV.MASV, SV.TENSV, SV.GIOITINH, SV.NGAYSINH, SV.QUEQUAN, L.TENLOP
+    FROM SINHVIEN SV
+    JOIN LOP L ON SV.MALOP = L.MALOP
+    WHERE L.MALOP = @MALOP
+    ORDER BY SV.MASV;
+
+    PRINT 'Hiển thị danh sách sinh viên theo lớp thành công.';
+END;
+
+--tạo thủ tục hiện danh sách sinh viên theo khoa
+CREATE PROCEDURE SP_HienThiSinhVienTheoKhoa
+    @MAKHOA char(10)
+AS
+BEGIN
+    -- Kiểm tra xem mã khoa có tồn tại trong bảng KHOA hay không
+    IF NOT EXISTS (SELECT 1 FROM KHOA WHERE MAKHOA = @MAKHOA)
+    BEGIN
+        PRINT 'Mã khoa không tồn tại.';
+        RETURN;
+    END
+
+    -- Truy vấn danh sách sinh viên theo khoa
+    SELECT SV.MASV, SV.TENSV, SV.GIOITINH, SV.NGAYSINH, SV.QUEQUAN, L.TENLOP, K.TENKHOA
+    FROM SINHVIEN SV
+    JOIN LOP L ON SV.MALOP = L.MALOP
+    JOIN KHOA K ON L.MAKHOA = K.MAKHOA
+    WHERE K.MAKHOA = @MAKHOA
+    ORDER BY SV.MASV;
+
+    PRINT 'Hiển thị danh sách sinh viên theo khoa thành công.';
+END;
+
+-- tạo thủ tục hiện danh sách sinh viên không qua môn và hiển thị môn học không qua
+CREATE PROCEDURE SP_HienThiSinhVienKhongQuaMon
+AS
+BEGIN
+    -- Truy vấn danh sách sinh viên không qua môn và môn học tương ứng
+    SELECT 
+        SV.MASV, 
+        SV.TENSV, 
+        MH.TENMH, 
+        CASE 
+            WHEN DIEM.DIEMLAN1 IS NOT NULL AND CAST(DIEM.DIEMLAN1 AS FLOAT) < 5 THEN DIEM.DIEMLAN1
+            WHEN DIEM.DIEMLAN2 IS NOT NULL AND CAST(DIEM.DIEMLAN2 AS FLOAT) < 5 THEN DIEM.DIEMLAN2
+        END AS DIEMKHONGQUA
+    FROM SINHVIEN SV
+    JOIN DIEM ON SV.MASV = DIEM.MASV
+    JOIN MONHOC MH ON DIEM.MAMH = MH.MAMH
+    WHERE 
+        (DIEM.DIEMLAN1 IS NOT NULL AND CAST(DIEM.DIEMLAN1 AS FLOAT) < 5) 
+        OR (DIEM.DIEMLAN2 IS NOT NULL AND CAST(DIEM.DIEMLAN2 AS FLOAT) < 5)
+    ORDER BY SV.MASV, MH.MAMH;
+
+    PRINT 'Hiển thị danh sách sinh viên không qua môn thành công.';
+END;
+
+EXEC SP_HienThiSinhVienKhongQuaMon;
+
+--tạo thủ tục hiển thị danh sách sinh viên theo điểm
+CREATE PROCEDURE SP_HienThiSinhVienTheoDiem
+AS
+BEGIN
+    -- Truy vấn danh sách sinh viên và điểm trung bình của họ
+    SELECT 
+        SV.MASV, 
+        SV.TENSV, 
+        AVG(CASE 
+            WHEN CAST(DIEM.DIEMLAN1 AS FLOAT) IS NOT NULL THEN CAST(DIEM.DIEMLAN1 AS FLOAT)
+            ELSE CAST(DIEM.DIEMLAN2 AS FLOAT)
+        END) AS DIEM_TRUNG_BINH
+    FROM SINHVIEN SV
+    LEFT JOIN DIEM ON SV.MASV = DIEM.MASV
+    GROUP BY SV.MASV, SV.TENSV
+    ORDER BY DIEM_TRUNG_BINH DESC;
+
+    PRINT 'Hiển thị danh sách sinh viên theo điểm thành công.';
+END;
+
+--tạo thủ tục hiển thị danh sách 100 sinh viên đủ điều kiện xét học bổng
+CREATE PROCEDURE SP_HienThiSinhVienXetHocBong
+AS
+BEGIN
+    -- Truy vấn danh sách 100 sinh viên đủ điều kiện xét học bổng
+    SELECT TOP 100 
+        SV.MASV, 
+        SV.TENSV, 
+        AVG(CASE 
+            WHEN CAST(DIEM.DIEMLAN1 AS FLOAT) IS NOT NULL THEN CAST(DIEM.DIEMLAN1 AS FLOAT)
+            ELSE CAST(DIEM.DIEMLAN2 AS FLOAT)
+        END) AS DIEM_TRUNG_BINH
+    FROM SINHVIEN SV
+    LEFT JOIN DIEM ON SV.MASV = DIEM.MASV
+    GROUP BY SV.MASV, SV.TENSV
+    HAVING AVG(CASE 
+            WHEN CAST(DIEM.DIEMLAN1 AS FLOAT) IS NOT NULL THEN CAST(DIEM.DIEMLAN1 AS FLOAT)
+            ELSE CAST(DIEM.DIEMLAN2 AS FLOAT)
+        END) >= 7.0
+    ORDER BY DIEM_TRUNG_BINH DESC;
+
+    PRINT 'Hiển thị danh sách 100 sinh viên đủ điều kiện xét học bổng thành công.';
+END;
+
 --THỦ TỤC LIÊN QUAN ĐẾN LỚP
 --tạo thủ tục thêm lớp
 CREATE PROCEDURE InsertLop
@@ -208,4 +346,377 @@ END
 
 exec GetStudentCountByLop
 
---tạo thủ tục 
+--tạo thủ tục hiện danh sách lớp theo khoa
+CREATE PROCEDURE SP_HienDanhSachLopTheoKhoa
+    @MAKHOA char(10)
+AS
+BEGIN
+    SELECT LOP.MALOP, LOP.TENLOP, KHOA.TENKHOA
+    FROM LOP
+    INNER JOIN KHOA ON LOP.MAKHOA = KHOA.MAKHOA
+    WHERE KHOA.MAKHOA = @MAKHOA;
+END;
+EXEC SP_HienDanhSachLopTheoKhoa @MAKHOA = 'IT01';
+
+--tạo thủ tục hiện danh sách lớp theo môn học
+CREATE PROCEDURE SP_HienDanhSachLopTheoMonHoc
+    @MAMH char(10)
+AS
+BEGIN
+    -- Kiểm tra nếu mã môn học không tồn tại
+    IF NOT EXISTS (SELECT 1 FROM MONHOC WHERE MAMH = @MAMH)
+    BEGIN
+        PRINT 'Môn học không tồn tại';
+        RETURN;
+    END
+
+    -- Kiểm tra nếu không có lớp nào cho môn học
+    IF NOT EXISTS (
+        SELECT DISTINCT LOP.MALOP 
+        FROM DIEM
+        INNER JOIN SINHVIEN ON DIEM.MASV = SINHVIEN.MASV
+        INNER JOIN LOP ON SINHVIEN.MALOP = LOP.MALOP
+        WHERE DIEM.MAMH = @MAMH
+    )
+    BEGIN
+        PRINT 'Không có lớp nào cho môn học này';
+        RETURN;
+    END
+
+    -- Nếu có dữ liệu, hiển thị danh sách lớp
+    SELECT DISTINCT LOP.MALOP, LOP.TENLOP
+    FROM DIEM
+    INNER JOIN SINHVIEN ON DIEM.MASV = SINHVIEN.MASV
+    INNER JOIN LOP ON SINHVIEN.MALOP = LOP.MALOP
+    WHERE DIEM.MAMH = @MAMH;
+END;
+
+insert into dbo.MONHOC
+values('MH_GT01', 'Giải tích 1', 3);
+
+EXEC SP_HienDanhSachLopTheoMonHoc @MAMH = 'MH_MMT03  '; --môn học tồn tại
+EXEC SP_HienDanhSachLopTheoMonHoc @MAMH = 'MH_M  '; -- môn học không tồn tại 
+EXEC SP_HienDanhSachLopTheoMonHoc @MAMH = 'MH_GT01  '; -- môn học không có lớp
+
+
+--THỦ TỤC LIÊN QUAN ĐẾN MÔN HỌC
+--tạo thủ tục thêm môn học
+CREATE PROCEDURE SP_ThemMonHoc
+    @MAMH char(10),
+    @TENMH nvarchar(50),
+    @SOTIN int
+AS
+BEGIN
+    -- Kiểm tra nếu mã môn học đã tồn tại
+    IF EXISTS (SELECT 1 FROM MONHOC WHERE MAMH = @MAMH)
+    BEGIN
+        PRINT 'Mã môn học đã tồn tại.';
+        RETURN;
+    END
+
+    -- Kiểm tra điều kiện số tín chỉ
+    IF @SOTIN <= 0 OR @SOTIN >= 9
+    BEGIN
+        PRINT 'Số tín chỉ không hợp lệ. Phải lớn hơn 0 và nhỏ hơn 9.';
+        RETURN;
+    END
+
+    -- Chèn bản ghi vào bảng MONHOC
+    INSERT INTO MONHOC (MAMH, TENMH, SOTIN)
+    VALUES (@MAMH, @TENMH, @SOTIN);
+
+    PRINT 'Thêm môn học thành công.';
+END;
+
+--tạo thủ tục sửa thông tin môn học
+CREATE PROCEDURE SP_SuaMonHoc
+    @MAMH char(10),
+    @TENMH nvarchar(50),
+    @SOTIN int
+AS
+BEGIN
+    -- Kiểm tra nếu mã môn học không tồn tại
+    IF NOT EXISTS (SELECT 1 FROM MONHOC WHERE MAMH = @MAMH)
+    BEGIN
+        PRINT 'Mã môn học không tồn tại.';
+        RETURN;
+    END
+
+    -- Kiểm tra điều kiện số tín chỉ
+    IF @SOTIN <= 0 OR @SOTIN >= 9
+    BEGIN
+        PRINT 'Số tín chỉ không hợp lệ. Phải lớn hơn 0 và nhỏ hơn 9.';
+        RETURN;
+    END
+
+    -- Cập nhật thông tin môn học
+    UPDATE MONHOC
+    SET TENMH = @TENMH, SOTIN = @SOTIN
+    WHERE MAMH = @MAMH;
+
+    PRINT 'Sửa thông tin môn học thành công.';
+END;
+
+--tạo thủ tục xóa môn học
+CREATE PROCEDURE SP_XoaMonHoc
+    @MAMH char(10)
+AS
+BEGIN
+    -- Kiểm tra nếu mã môn học không tồn tại
+    IF NOT EXISTS (SELECT 1 FROM MONHOC WHERE MAMH = @MAMH)
+    BEGIN
+        PRINT 'Mã môn học không tồn tại.';
+        RETURN;
+    END
+
+    -- Xóa môn học
+    DELETE FROM MONHOC
+    WHERE MAMH = @MAMH;
+
+    PRINT 'Xóa môn học thành công.';
+END;
+
+--tạo thủ tục hiện tất cả môn học
+CREATE PROCEDURE SP_HienTatCaMonHoc
+AS
+BEGIN
+    -- Truy vấn và trả về tất cả các môn học
+    SELECT MAMH, TENMH, SOTIN
+    FROM MONHOC;
+
+    PRINT 'Hiển thị tất cả các môn học thành công.';
+END;
+
+--tạo thủ tục hiển thị danh sách môn học theo khoa
+CREATE PROCEDURE SP_HienMonHocTheoKhoa
+    @MAKHOA char(10)
+AS
+BEGIN
+    -- Kiểm tra xem mã khoa có tồn tại trong bảng KHOA hay không
+    IF NOT EXISTS (SELECT 1 FROM KHOA WHERE MAKHOA = @MAKHOA)
+    BEGIN
+        PRINT 'Mã khoa không tồn tại.';
+        RETURN;
+    END
+
+    -- Truy vấn và trả về danh sách môn học theo mã khoa
+    SELECT MH.MAMH, MH.TENMH, MH.SOTIN
+    FROM MONHOC MH
+    INNER JOIN LOP L ON L.MAKHOA = @MAKHOA
+    WHERE L.MALOP IN (SELECT MALOP FROM SINHVIEN WHERE MALOP IS NOT NULL)
+    ORDER BY MH.MAMH;
+
+    PRINT 'Hiển thị danh sách môn học theo khoa thành công.';
+END;
+
+--tạo thủ tục hiển thị danh sách môn học theo khóa học
+CREATE PROCEDURE SP_HienMonHocTheoKhoaHoc
+    @MAKH char(10)
+AS
+BEGIN
+    -- Kiểm tra xem mã khóa học có tồn tại trong bảng KHOAHOC hay không
+    IF NOT EXISTS (SELECT 1 FROM KHOAHOC WHERE MAKH = @MAKH)
+    BEGIN
+        PRINT 'Mã khóa học không tồn tại.';
+        RETURN;
+    END
+
+    -- Truy vấn và trả về danh sách môn học theo mã khóa học
+    SELECT MH.MAMH, MH.TENMH, MH.SOTIN
+    FROM MONHOC MH
+    INNER JOIN LOP L ON L.MAKHOAHOC = @MAKH
+    WHERE L.MALOP IN (SELECT MALOP FROM SINHVIEN WHERE MALOP IS NOT NULL)
+    ORDER BY MH.MAMH;
+
+    PRINT 'Hiển thị danh sách môn học theo khóa học thành công.';
+END;
+
+--tạo thủ tục hiển thị danh sách môn học theo lớp
+CREATE PROCEDURE SP_HienMonHocTheoLop
+    @MALOP char(10)
+AS
+BEGIN
+    -- Kiểm tra xem mã lớp có tồn tại trong bảng LOP hay không
+    IF NOT EXISTS (SELECT 1 FROM LOP WHERE MALOP = @MALOP)
+    BEGIN
+        PRINT 'Mã lớp không tồn tại.';
+        RETURN;
+    END
+
+    -- Truy vấn và trả về danh sách môn học theo mã lớp
+    SELECT MH.MAMH, MH.TENMH, MH.SOTIN
+    FROM MONHOC MH
+    INNER JOIN SINHVIEN SV ON SV.MALOP = @MALOP
+    INNER JOIN LOP L ON L.MALOP = SV.MALOP
+    WHERE L.MALOP = @MALOP
+    ORDER BY MH.MAMH;
+
+    PRINT 'Hiển thị danh sách môn học theo lớp thành công.';
+END;
+
+--tạo thủ tục lọc danh sách môn theo hệ đào tạo
+CREATE PROCEDURE SP_LocDanhSachMonTheoHeDaoTao
+    @MAHEDT char(10)
+AS
+BEGIN
+    -- Kiểm tra nếu hệ đào tạo không tồn tại
+    IF NOT EXISTS (SELECT 1 FROM HEDT WHERE MAHEDT = @MAHEDT)
+    BEGIN
+        PRINT 'Hệ đào tạo không tồn tại';
+        RETURN;
+    END
+
+    -- Lọc danh sách môn học theo hệ đào tạo
+    SELECT DISTINCT MONHOC.MAMH, MONHOC.TENMH, MONHOC.SOTIN
+    FROM LOP
+    INNER JOIN SINHVIEN ON LOP.MALOP = SINHVIEN.MALOP
+    INNER JOIN DIEM ON SINHVIEN.MASV = DIEM.MASV
+    INNER JOIN MONHOC ON DIEM.MAMH = MONHOC.MAMH
+    WHERE LOP.MAHDT = @MAHEDT;
+    
+    -- Kiểm tra nếu không có môn học nào cho hệ đào tạo
+    IF @@ROWCOUNT = 0
+    BEGIN
+        PRINT 'Không có môn học nào cho hệ đào tạo này';
+    END
+END;
+
+EXEC SP_LocDanhSachMonTheoHeDaoTao @MAHEDT = 'HDT_DHCQ    ';
+
+--THỦ TỤC LIÊN QUAN ĐẾN KHÓA HỌC
+--tạo thủ tục thêm khóa học
+CREATE PROCEDURE SP_ThemKhoaHoc
+    @MAKH char(10),
+    @TENKH nvarchar(50),
+    @NIENKHOA nvarchar(50)
+AS
+BEGIN
+    -- Kiểm tra xem mã khóa học đã tồn tại chưa
+    IF EXISTS (SELECT 1 FROM KHOAHOC WHERE MAKH = @MAKH)
+    BEGIN
+        PRINT 'Mã khóa học đã tồn tại.';
+        RETURN;
+    END
+
+    -- Thêm bản ghi vào bảng KHOAHOC
+    INSERT INTO KHOAHOC (MAKH, TENKH, NIENKHOA)
+    VALUES (@MAKH, @TENKH, @NIENKHOA);
+
+    PRINT 'Thêm khóa học thành công.';
+END;
+
+--tạo thủ tục sửa khóa học
+CREATE PROCEDURE SP_SuaKhoaHoc
+    @MAKH char(10),
+    @TENKH nvarchar(50),
+    @NIENKHOA nvarchar(50)
+AS
+BEGIN
+    -- Kiểm tra xem mã khóa học có tồn tại trong bảng KHOAHOC hay không
+    IF NOT EXISTS (SELECT 1 FROM KHOAHOC WHERE MAKH = @MAKH)
+    BEGIN
+        PRINT 'Mã khóa học không tồn tại.';
+        RETURN;
+    END
+
+    -- Cập nhật thông tin khóa học
+    UPDATE KHOAHOC
+    SET TENKH = @TENKH,
+        NIENKHOA = @NIENKHOA
+    WHERE MAKH = @MAKH;
+
+    PRINT 'Sửa thông tin khóa học thành công.';
+END;
+
+--tạo thủ tục xóa khóa học
+CREATE PROCEDURE SP_XoaKhoaHoc
+    @MAKH char(10)
+AS
+BEGIN
+    -- Kiểm tra xem mã khóa học có tồn tại trong bảng KHOAHOC hay không
+    IF NOT EXISTS (SELECT 1 FROM KHOAHOC WHERE MAKH = @MAKH)
+    BEGIN
+        PRINT 'Mã khóa học không tồn tại.';
+        RETURN;
+    END
+
+    -- Xóa bản ghi khỏi bảng KHOAHOC
+    DELETE FROM KHOAHOC
+    WHERE MAKH = @MAKH;
+
+    PRINT 'Xóa khóa học thành công.';
+END;
+
+----tạo thủ tục hiển thị danh sách các khóa học
+CREATE PROCEDURE SP_HienThiDanhSachKhoaHoc
+AS
+BEGIN
+    -- Truy vấn và trả về toàn bộ danh sách khóa học
+    SELECT MAKH, TENKH, NIENKHOA
+    FROM KHOAHOC
+    ORDER BY MAKH;
+
+    PRINT 'Hiển thị danh sách khóa học thành công.';
+END;
+
+--THỦ TỤC LIÊN QUAN ĐẾN ĐIỂM
+--tạo thủ tục hiện bảng điểm theo lớp
+CREATE PROCEDURE SP_HienBangDiemTheoLop
+    @MALOP CHAR(10)  -- Nhận mã lớp làm tham số đầu vào
+AS
+BEGIN
+    -- Truy vấn bảng điểm theo lớp
+    SELECT 
+        SV.MASV, 
+        SV.TENSV, 
+        MH.TENMH, 
+        DIEM.HOCKY, 
+        DIEM.DIEMLAN1, 
+        DIEM.DIEMLAN2,
+        CASE 
+            WHEN CAST(DIEM.DIEMLAN1 AS FLOAT) IS NOT NULL AND CAST(DIEM.DIEMLAN2 AS FLOAT) IS NOT NULL 
+            THEN (CAST(DIEM.DIEMLAN1 AS FLOAT) + CAST(DIEM.DIEMLAN2 AS FLOAT)) / 2
+            ELSE NULL 
+        END AS DIEM_TRUNG_BINH
+    FROM SINHVIEN SV
+    JOIN LOP L ON SV.MALOP = L.MALOP
+    LEFT JOIN DIEM ON SV.MASV = DIEM.MASV
+    LEFT JOIN MONHOC MH ON DIEM.MAMH = MH.MAMH
+    WHERE L.MALOP = @MALOP
+    ORDER BY SV.MASV;
+
+    PRINT 'Hiển thị bảng điểm theo lớp thành công.';
+END;
+
+--tạo thủ tục hiển thi bảng điểm theo mã sinh viên
+CREATE PROCEDURE SP_HienBangDiemTheoMaSV
+    @MASV CHAR(15)  -- Nhận mã sinh viên làm tham số đầu vào
+AS
+BEGIN
+    -- Truy vấn bảng điểm theo mã sinh viên
+    SELECT 
+        SV.MASV, 
+        SV.TENSV, 
+        MH.TENMH, 
+        DIEM.HOCKY, 
+        DIEM.DIEMLAN1, 
+        DIEM.DIEMLAN2,
+        CASE 
+            WHEN CAST(DIEM.DIEMLAN1 AS FLOAT) IS NOT NULL AND CAST(DIEM.DIEMLAN2 AS FLOAT) IS NOT NULL 
+            THEN (CAST(DIEM.DIEMLAN1 AS FLOAT) + CAST(DIEM.DIEMLAN2 AS FLOAT)) / 2
+            ELSE NULL 
+        END AS DIEM_TRUNG_BINH
+    FROM SINHVIEN SV
+    LEFT JOIN DIEM ON SV.MASV = DIEM.MASV
+    LEFT JOIN MONHOC MH ON DIEM.MAMH = MH.MAMH
+    WHERE SV.MASV = @MASV;
+
+    IF @@ROWCOUNT = 0
+    BEGIN
+        PRINT 'Không tìm thấy sinh viên với mã đã cho.';
+    END
+    ELSE
+    BEGIN
+        PRINT 'Hiển thị bảng điểm theo mã sinh viên thành công.';
+    END
+END;
